@@ -45,4 +45,4 @@ export LD_LIBRARY_PATH=../HIK_TEF_Driver_module/lib:$LD_LIBRARY_PATH
 
 # 过滤掉十六进制数据输出，只保留重要信息
 cd build
-./camera_server "$@" 2>&1 | grep -v "^[0-9A-F][0-9A-F] " | grep -v "^[[:space:]]*[0-9A-F][0-9A-F]"
+./camera_server "$@" 2>&1 | grep -E "^\[|^=|^Server|^Camera|^WebSocket|^Performance|^Client|^Error|^Warning" || true
