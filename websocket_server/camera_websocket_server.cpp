@@ -83,12 +83,40 @@ void CameraWebSocketServer::camera_capture_loop() {
         camera.Photograph_join();
         
         if (camera.Photograph_ret == 0) {
+            // 检查数据是否为空
+            bool data_valid = false;
+            for (int i = 0; i < 100; i++) {
+                if (pData[i] != 0) {
+                    data_valid = true;
+                    break;
+                }
+            }
+            
+            if (!data_valid) {
+                std::cerr << "[Camera] Warning: Image data appears to be empty" << std::endl;
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                continue;
+            }
+            
             // 转换为OpenCV Mat
             cv::Mat raw_image(camera.nHeight, camera.nWidth, CV_8UC3, pData);
             
-            // 转换颜色空间 (假设相机输出BGR格式)
+            // 检查Mat是否有效
+            if (raw_image.empty()) {
+                std::cerr << "[Camera] Error: Failed to create Mat from image data" << std::endl;
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                continue;
+            }
+            
+            // 转换颜色空间 (假设相机输出RGB格式，转换为BGR)
             cv::Mat bgr_image;
-            cv::cvtColor(raw_image, bgr_image, cv::COLOR_RGB2BGR);
+            try {
+                cv::cvtColor(raw_image, bgr_image, cv::COLOR_RGB2BGR);
+            } catch (const cv::Exception& e) {
+                std::cerr << "[Camera] Color conversion error: " << e.what() << std::endl;
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                continue;
+            }
             
             // 绘制准星
             if (enable_crosshair) {
@@ -98,7 +126,13 @@ void CameraWebSocketServer::camera_capture_loop() {
             // 编码为JPEG
             std::vector<uchar> jpeg_buffer;
             std::vector<int> params = {cv::IMWRITE_JPEG_QUALITY, jpeg_quality};
-            cv::imencode(".jpg", bgr_image, jpeg_buffer, params);
+            bool encode_success = cv::imencode(".jpg", bgr_image, jpeg_buffer, params);
+            
+            if (!encode_success || jpeg_buffer.empty()) {
+                std::cerr << "[Camera] JPEG encoding failed" << std::endl;
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                continue;
+            }
             
             // 广播到所有客户端
             if (!connections.empty()) {
