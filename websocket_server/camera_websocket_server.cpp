@@ -75,12 +75,16 @@ void CameraWebSocketServer::camera_capture_loop() {
     // 计算帧间隔
     auto frame_interval = std::chrono::milliseconds(1000 / frame_rate);
     
+    int frame_counter = 0;
+    
     while (running) {
         auto start_time = std::chrono::steady_clock::now();
+        auto t1 = start_time;
         
         // 多线程拍摄
         camera.Photograph_background(pData, 1000);
         camera.Photograph_join();
+        auto t2 = std::chrono::steady_clock::now();
         
         if (camera.Photograph_ret == 0) {
             // 检查数据是否为空
@@ -107,6 +111,7 @@ void CameraWebSocketServer::camera_capture_loop() {
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 continue;
             }
+            auto t3 = std::chrono::steady_clock::now();
             
             // Bayer RG 8转换为BGR
             cv::Mat bgr_image;
@@ -118,11 +123,13 @@ void CameraWebSocketServer::camera_capture_loop() {
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 continue;
             }
+            auto t4 = std::chrono::steady_clock::now();
             
             // 绘制准星
             if (enable_crosshair) {
                 draw_crosshair(bgr_image);
             }
+            auto t5 = std::chrono::steady_clock::now();
             
             // 编码为JPEG
             std::vector<uchar> jpeg_buffer;
@@ -134,10 +141,32 @@ void CameraWebSocketServer::camera_capture_loop() {
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 continue;
             }
+            auto t6 = std::chrono::steady_clock::now();
             
             // 广播到所有客户端
             if (!connections.empty()) {
                 broadcast_frame(jpeg_buffer);
+            }
+            auto t7 = std::chrono::steady_clock::now();
+            
+            // 每30帧输出一次性能统计
+            frame_counter++;
+            if (frame_counter % 30 == 0) {
+                auto capture_ms = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+                auto mat_ms = std::chrono::duration_cast<std::chrono::milliseconds>(t3 - t2).count();
+                auto bayer_ms = std::chrono::duration_cast<std::chrono::milliseconds>(t4 - t3).count();
+                auto crosshair_ms = std::chrono::duration_cast<std::chrono::milliseconds>(t5 - t4).count();
+                auto jpeg_ms = std::chrono::duration_cast<std::chrono::milliseconds>(t6 - t5).count();
+                auto broadcast_ms = std::chrono::duration_cast<std::chrono::milliseconds>(t7 - t6).count();
+                auto total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(t7 - t1).count();
+                
+                std::cout << "[Performance] Capture:" << capture_ms << "ms | "
+                          << "Mat:" << mat_ms << "ms | "
+                          << "Bayer:" << bayer_ms << "ms | "
+                          << "Crosshair:" << crosshair_ms << "ms | "
+                          << "JPEG:" << jpeg_ms << "ms | "
+                          << "Broadcast:" << broadcast_ms << "ms | "
+                          << "Total:" << total_ms << "ms (" << (1000.0/total_ms) << " fps)" << std::endl;
             }
             
             // 控制帧率
