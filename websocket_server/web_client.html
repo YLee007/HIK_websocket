@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>HIK相机实时视频流</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            width: 100%;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+        
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .video-container {
+            position: relative;
+            width: 100%;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 300px;
+        }
+        
+        #videoImage {
+            max-width: 100%;
+            max-height: 80vh;
+            display: block;
+        }
+        
+        .status-bar {
+            display: flex;
+            justify-content: space-around;
+            padding: 15px;
+            background: #f5f5f5;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .status-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 100px;
+        }
+        
+        .status-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .status-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .status-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        
+        .status-dot.connected {
+            background: #4caf50;
+            box-shadow: 0 0 10px #4caf50;
+        }
+        
+        .status-dot.disconnected {
+            background: #f44336;
+        }
+        
+        .controls {
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-danger {
+            background: #f44336;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #da190b;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(244, 67, 54, 0.4);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .connection-form {
+            padding: 20px;
+            border-top: 1px solid #eee;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #333;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 18px;
+        }
+        
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 20px;
+            }
+            
+            .status-bar {
+                padding: 10px;
+            }
+            
+            .status-item {
+                min-width: 80px;
+            }
+            
+            .status-value {
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎥 HIK相机实时视频流</h1>
+            <p>海康威视工业相机 WebSocket 实时传输</p>
+        </div>
+        
+        <div class="video-container">
+            <img id="videoImage" alt="等待视频流..." style="display: none;">
+            <div class="loading" id="loading">等待连接...</div>
+        </div>
+        
+        <div class="status-bar">
+            <div class="status-item">
+                <span class="status-label">连接状态</span>
+                <span class="status-value">
+                    <span class="status-dot" id="statusDot"></span>
+                    <span id="statusText">未连接</span>
+                </span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">帧率</span>
+                <span class="status-value" id="fpsValue">0 fps</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">延迟</span>
+                <span class="status-value" id="latencyValue">0 ms</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">接收帧数</span>
+                <span class="status-value" id="frameCount">0</span>
+            </div>
+        </div>
+        
+        <div class="connection-form">
+            <div class="form-group">
+                <label for="serverUrl">服务器地址</label>
+                <input type="text" id="serverUrl" placeholder="ws://192.168.1.100:9002" value="ws://localhost:9002">
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button class="btn btn-primary" id="connectBtn" onclick="connect()">连接</button>
+            <button class="btn btn-danger" id="disconnectBtn" onclick="disconnect()" disabled>断开</button>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let frameCount = 0;
+        let lastFrameTime = Date.now();
+        let fpsCounter = 0;
+        let fpsInterval = null;
+        
+        const videoImage = document.getElementById('videoImage');
+        const loading = document.getElementById('loading');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const fpsValue = document.getElementById('fpsValue');
+        const latencyValue = document.getElementById('latencyValue');
+        const frameCountElement = document.getElementById('frameCount');
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const serverUrlInput = document.getElementById('serverUrl');
+        
+        function connect() {
+            const serverUrl = serverUrlInput.value.trim();
+            
+            if (!serverUrl) {
+                alert('请输入服务器地址');
+                return;
+            }
+            
+            try {
+                ws = new WebSocket(serverUrl);
+                ws.binaryType = 'arraybuffer';
+                
+                ws.onopen = function() {
+                    console.log('WebSocket连接已建立');
+                    updateStatus(true);
+                    connectBtn.disabled = true;
+                    disconnectBtn.disabled = false;
+                    serverUrlInput.disabled = true;
+                    
+                    // 启动FPS计数器
+                    fpsCounter = 0;
+                    fpsInterval = setInterval(() => {
+                        fpsValue.textContent = fpsCounter + ' fps';
+                        fpsCounter = 0;
+                    }, 1000);
+                };
+                
+                ws.onmessage = function(event) {
+                    const blob = new Blob([event.data], { type: 'image/jpeg' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    // 释放之前的URL
+                    if (videoImage.src) {
+                        URL.revokeObjectURL(videoImage.src);
+                    }
+                    
+                    videoImage.src = url;
+                    videoImage.style.display = 'block';
+                    loading.style.display = 'none';
+                    
+                    // 更新统计信息
+                    frameCount++;
+                    fpsCounter++;
+                    frameCountElement.textContent = frameCount;
+                    
+                    const now = Date.now();
+                    const latency = now - lastFrameTime;
+                    latencyValue.textContent = latency + ' ms';
+                    lastFrameTime = now;
+                };
+                
+                ws.onerror = function(error) {
+                    console.error('WebSocket错误:', error);
+                    alert('连接错误，请检查服务器地址和网络连接');
+                };
+                
+                ws.onclose = function() {
+                    console.log('WebSocket连接已关闭');
+                    updateStatus(false);
+                    connectBtn.disabled = false;
+                    disconnectBtn.disabled = true;
+                    serverUrlInput.disabled = false;
+                    loading.style.display = 'block';
+                    loading.textContent = '连接已断开';
+                    
+                    if (fpsInterval) {
+                        clearInterval(fpsInterval);
+                        fpsInterval = null;
+                    }
+                };
+                
+            } catch (error) {
+                console.error('创建WebSocket失败:', error);
+                alert('连接失败: ' + error.message);
+            }
+        }
+        
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+        
+        function updateStatus(connected) {
+            if (connected) {
+                statusDot.classList.add('connected');
+                statusDot.classList.remove('disconnected');
+                statusText.textContent = '已连接';
+            } else {
+                statusDot.classList.remove('connected');
+                statusDot.classList.add('disconnected');
+                statusText.textContent = '未连接';
+                fpsValue.textContent = '0 fps';
+                latencyValue.textContent = '0 ms';
+            }
+        }
+        
+        // 页面卸载时断开连接
+        window.addEventListener('beforeunload', function() {
+            disconnect();
+        });
+        
+        // 自动连接（可选）
+        // window.addEventListener('load', function() {
+        //     setTimeout(connect, 500);
+        // });
+    </script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+# Build directories
+build/
+cmake-build-*/
+
+# Third party libraries
+third_party/
+
+# Visual Studio
+.vs/
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.sln
+
+# Executables
+*.exe
+*.out
+*.app
+
+# Object files
+*.o
+*.obj
+
+# Libraries
+*.lib
+*.a
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
