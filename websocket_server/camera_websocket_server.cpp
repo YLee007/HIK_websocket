@@ -69,8 +69,8 @@ void CameraWebSocketServer::camera_capture_loop() {
     std::cout << "[Camera] Initialized successfully. Resolution: " 
               << camera.nWidth << "x" << camera.nHeight << std::endl;
     
-    // 分配图像缓冲区
-    unsigned char* pData = new unsigned char[camera.nWidth * camera.nHeight * 3];
+    // 分配图像缓冲区 (Bayer RG 8是单通道格式)
+    unsigned char* pData = new unsigned char[camera.nWidth * camera.nHeight];
     
     // 计算帧间隔
     auto frame_interval = std::chrono::milliseconds(1000 / frame_rate);
@@ -98,22 +98,23 @@ void CameraWebSocketServer::camera_capture_loop() {
                 continue;
             }
             
-            // 转换为OpenCV Mat
-            cv::Mat raw_image(camera.nHeight, camera.nWidth, CV_8UC3, pData);
+            // 创建Bayer格式的Mat (单通道)
+            cv::Mat bayer_image(camera.nHeight, camera.nWidth, CV_8UC1, pData);
             
             // 检查Mat是否有效
-            if (raw_image.empty()) {
+            if (bayer_image.empty()) {
                 std::cerr << "[Camera] Error: Failed to create Mat from image data" << std::endl;
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 continue;
             }
             
-            // 转换颜色空间 (假设相机输出RGB格式，转换为BGR)
+            // Bayer RG 8转换为BGR
             cv::Mat bgr_image;
             try {
-                cv::cvtColor(raw_image, bgr_image, cv::COLOR_RGB2BGR);
+                // Bayer RG格式使用COLOR_BayerRG2BGR
+                cv::cvtColor(bayer_image, bgr_image, cv::COLOR_BayerRG2BGR);
             } catch (const cv::Exception& e) {
-                std::cerr << "[Camera] Color conversion error: " << e.what() << std::endl;
+                std::cerr << "[Camera] Bayer conversion error: " << e.what() << std::endl;
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 continue;
             }
